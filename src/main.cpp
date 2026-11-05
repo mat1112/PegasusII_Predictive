@@ -1,5 +1,5 @@
 /* ||  \n
-2026-Nov-01
+2026-Nov-05
 
 With PTT processor. With SGP4 satellite tracking. With SD card file processing. With RTC time via Wifi.
    With Ham4 Super AZ rotator and KR500 EL rotator. With IC-9700 radio CIV control.
@@ -851,6 +851,8 @@ typedef enum {
 uint8_t SatCurSpeed = SATSPEED_10s;
 
 int satslowdowncount = 0;
+int AOStoLOSsec = 0;
+int satLeftSec = 0;
 
 double SatLastPeakEL = 0;
 int SatLastMoveAZ = 0;
@@ -4422,6 +4424,16 @@ void Sat_Tick()
   satFILEmsg +=  "\n\n";
   satFILEmsg += tickline;
   satFILEmsg +=  "\n\n";
+
+  satFILEmsg += "Pass to go = ";
+  satFILEmsg += String(satLeftSec);
+  satFILEmsg += " seconds, or";
+  satFILEmsg += String(satLeftSec / 60);
+  satFILEmsg += " minutes and ";
+  satFILEmsg += String(satLeftSec % 60);
+  satFILEmsg += " seconds";
+  satFILEmsg += '\n';
+
   satFILEmsg += "azimuth = ";
   satFILEmsg += String(satReqAZ);
   satFILEmsg +=  '\n';
@@ -4447,6 +4459,16 @@ void Sat_Tick()
   satHTMLmsg += "<br /><br />";
   satHTMLmsg += tickline;
   satHTMLmsg += "<br /><br />";
+
+  satHTMLmsg += "Pass to go = ";
+  satHTMLmsg += String(satLeftSec);
+  satHTMLmsg += " seconds,<br /> or";
+  satHTMLmsg += String(satLeftSec / 60);
+  satHTMLmsg += " minutes and <br />";
+  satHTMLmsg += String(satLeftSec % 60);
+  satHTMLmsg += " seconds";
+  satHTMLmsg += "<br />";
+
   satHTMLmsg += "azimuth = ";
   satHTMLmsg += String(satReqAZ);
   satHTMLmsg += "<br />";
@@ -4521,6 +4543,7 @@ void Sat_Tick()
   }
 
   SatGo = false;
+  satLeftSec -= SatCycleSeconds;
 }
 
 void SatSpeedAdjust(int SatAZ)
@@ -4833,7 +4856,6 @@ void Predict(int many){
   // Durations
   if (many == 1)
   {
-    int AOStoLOSsec = 0;
     UnixTime stamp2(timezone); // remember unixtime is gmt.
     stamp2.setDateTime(AOSyear, AOSmon, AOSday, AOShr, AOSminute, AOSsec);
     AOSunixtime = stamp2.getUnix();
@@ -4845,6 +4867,7 @@ void Predict(int many){
     LOStimeSet = true;
 
     AOStoLOSsec = LOSunixtime - AOSunixtime;
+    satLeftSec = AOStoLOSsec;
 
     filemsg = "AOS to LOS = ";
     filemsg += String(AOStoLOSsec);
