@@ -1,5 +1,5 @@
 /* ||  \n
-2026-Nov-05
+2026-Nov-06
 
 With PTT processor. With SGP4 satellite tracking. With SD card file processing. With RTC time via Wifi.
    With Ham4 Super AZ rotator and KR500 EL rotator. With IC-9700 radio CIV control.
@@ -129,6 +129,7 @@ NOTE all control is now via the serial port and/or web dashboard. No buttons.
   S5 - SWR test. RX (VHF) RHCP
   S6 - SWR test. RX (VHF) LHCP
   S9 - Toggle radioCatOn. Default off.
+  SA - Toggle satDisableAutoCycleTime. Default off.
   T - Reset degrees.
   T1-8 - test relays. 84D 0X54H
   T0 off. T1 pwr. T2 brake. T3 left. T4 right. T5 up. T6 down. T7 TLV. T8 polarize LHCP.
@@ -244,6 +245,7 @@ ASCII command quick reference:<br>
 <b>S5</b> - SWR test. RX (VHF) RHCP<br>
 <b>S6</b> - SWR test. RX (VHF) LHCP<br>
 <b>S9</b> - Toggle radioCatOn. Default off.<br>
+<b>SA</b> - Toggle satDisableAutoCycleTime. Default off.<br>
 <b>T</b> - Reset degrees.<br>
 <b>T1-8</b> - test relays.<br>
 <b>T0</b> off. <b>T1</b> pwr. <b>T2</b> brake.<br> <b>T3</b> left. <b>T4</b> right. <b>T5</b> up.<br> <b>T6</b> down. <b>T7</b> TLV.<br> <b>T8</b> polarize LHCP.<br>
@@ -388,7 +390,7 @@ Adafruit_ADS1115 adc;
 #define EL_CAL_MAX_DEFAULT 3600    // Preset the Elevation Max Calibration Point
 
 // EL logaritmic pot adjustments
-#define EL_KR500_90_ADC 13072      // Calibration points to give 4 logarithmic segments.
+#define EL_KR500_90_ADC 12720      // Calibration points to give 4 logarithmic segments.
 #define EL_KR500_45_ADC 18736
 #define KR500_Min_Voltage 3600
 #define KR500_Max_Voltage 23300
@@ -412,8 +414,8 @@ Adafruit_ADS1115 adc;
 #define el75deg 15056
 #define el80deg 14288
 #define el85deg 13728
-#define el90deg 13072
-#define el95deg 12500
+#define el90deg 12720
+#define el95deg 12300
 #define el100deg 11800
 #define el135deg 8440
 #define el180deg 3600
@@ -853,6 +855,7 @@ uint8_t SatCurSpeed = SATSPEED_10s;
 int satslowdowncount = 0;
 int AOStoLOSsec = 0;
 int satLeftSec = 0;
+bool satDisableAutoCycleTime = false;
 
 double SatLastPeakEL = 0;
 int SatLastMoveAZ = 0;
@@ -4462,12 +4465,12 @@ void Sat_Tick()
 
   satHTMLmsg += "Pass to go = ";
   satHTMLmsg += String(satLeftSec);
-  satHTMLmsg += " seconds,<br /> or";
+  satHTMLmsg += " seconds,<br /> or ";
   satHTMLmsg += String(satLeftSec / 60);
   satHTMLmsg += " minutes and <br />";
   satHTMLmsg += String(satLeftSec % 60);
   satHTMLmsg += " seconds";
-  satHTMLmsg += "<br />";
+  satHTMLmsg += "<br /><br />";
 
   satHTMLmsg += "azimuth = ";
   satHTMLmsg += String(satReqAZ);
@@ -4477,7 +4480,7 @@ void Sat_Tick()
   satHTMLmsg += "<br />";
   satHTMLmsg += " distance = ";
   satHTMLmsg += String(sat.satDist);
-  satHTMLmsg += "<br />";
+  satHTMLmsg += "<br /><br />";
   satHTMLmsg += " look-ahead = ";
   satHTMLmsg += String(satLookAheadSeconds);
   satHTMLmsg += " seconds<br />";
@@ -4486,7 +4489,7 @@ void Sat_Tick()
   satHTMLmsg += "<br />";
   satHTMLmsg += "look-ahead elevation = ";
   satHTMLmsg += String(lookAheadEL);
-  satHTMLmsg += "<br />";
+  satHTMLmsg += "<br /><br />";
   satHTMLmsg +=  String(SatCycleSeconds);
   satHTMLmsg += " second cycle time<br />";
 
@@ -4543,13 +4546,14 @@ void Sat_Tick()
   }
 
   SatGo = false;
-  satLeftSec -= SatCycleSeconds;
+  if (AOSok) { satLeftSec -= SatCycleSeconds; } else { satLeftSec = 0; }
 }
 
 void SatSpeedAdjust(int SatAZ)
 {
   if (!satTracking) { return; }
   if (SatLastMoveAZ == SatAZ) { return; }
+  if (satDisableAutoCycleTime) { return; }
 
   int distance = getShortestDistance(SatLastMoveAZ, SatAZ);
 
@@ -6499,6 +6503,8 @@ void cmdhandler()  // Command Handler Function
             dashbnserialmsg += disable_ptt ? Off : On;
             dashbnserialmsg += "\nradioCatOn is ";
             radioCatOn ? dashbnserialmsg += "YES ON" : dashbnserialmsg += "NO OFF";
+            dashbnserialmsg += "\nsatDisableAutoCycleTime is ";
+            satDisableAutoCycleTime ? dashbnserialmsg += "Constant" : dashbnserialmsg += "NO OFF";
             break;
           case 49: // S1 - toggle PTT_disable. Default off.
             dashbnserialmsg += "S1? cmd<br />";
@@ -6514,6 +6520,8 @@ void cmdhandler()  // Command Handler Function
             dashbnserialmsg += disable_ptt ? Off : On;
             dashbnserialmsg += "\nradioCatOn is ";
             radioCatOn ? dashbnserialmsg += "YES ON" : dashbnserialmsg += "NO OFF";
+            dashbnserialmsg += "\nsatDisableAutoCycleTime is ";
+            satDisableAutoCycleTime ? dashbnserialmsg += "Constant" : dashbnserialmsg += "NO OFF";            
             break;
           case 50: // S2 - toggle rotator enable/disable
             dashbnserialmsg += "S2? cmd<br />";
@@ -6532,6 +6540,8 @@ void cmdhandler()  // Command Handler Function
             dashbnserialmsg += disable_ptt ? Off : On;
             dashbnserialmsg += "\nradioCatOn is ";
             radioCatOn ? dashbnserialmsg += "YES ON" : dashbnserialmsg += "NO OFF";
+            dashbnserialmsg += "\nsatDisableAutoCycleTime is ";
+            satDisableAutoCycleTime ? dashbnserialmsg += "Constant" : dashbnserialmsg += "NO OFF";
             break;
           case 51: // S3 - SWR test. RX (UHF) RHCP. Default.
             dashbnserialmsg += "S3? cmd<br />";
@@ -6579,7 +6589,20 @@ void cmdhandler()  // Command Handler Function
             dashbnserialmsg += disable_ptt ? Off : On;
             dashbnserialmsg += "\nradioCatOn is ";
             radioCatOn ? dashbnserialmsg += "YES ON" : dashbnserialmsg += "NO OFF";
+            dashbnserialmsg += "\nsatDisableAutoCycleTime is ";
+            satDisableAutoCycleTime ? dashbnserialmsg += "Constant" : dashbnserialmsg += "NO OFF";          
             break;
+          case 65: // Sa - Toggle satDisableAutoCycleTime switch
+            satDisableAutoCycleTime = !satDisableAutoCycleTime;
+            dashbnserialmsg += "\nRotators are ";
+            dashbnserialmsg += (disable_rotators ? Off : On);
+            dashbnserialmsg += "\nPTT interupts are ";
+            dashbnserialmsg += disable_ptt ? Off : On;
+            dashbnserialmsg += "\nradioCatOn is ";
+            radioCatOn ? dashbnserialmsg += "YES ON" : dashbnserialmsg += "NO OFF";
+            dashbnserialmsg += "\nsatDisableAutoCycleTime is ";
+            satDisableAutoCycleTime ? dashbnserialmsg += "Constant" : dashbnserialmsg += "NO OFF";
+              break;
         }
       }else{
         dashbnserialmsg += "S? cmd<br />";
